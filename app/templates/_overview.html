@@ -1,0 +1,106 @@
+{% import "_charts.html" as charts %}
+
+{# 날짜를 누르면 스크립트가 옆 칸의 거래를 바꾼다. 스크립트가 없으면 그날의 거래 내역으로 간다. #}
+{% macro calendar(month_calendar) %}
+<div class="dash-calendar-body">
+  <div class="cal-box">
+    <div class="cal" role="group" aria-label="날짜별 수입과 지출">
+      {% for name in "일월화수목금토" %}<div class="cal-weekday">{{ name }}</div>{% endfor %}
+      {% for week in month_calendar.weeks %}{% for day in week %}
+        {% if not day %}
+        <span class="cal-blank"></span>
+        {% elif day.state == "active" %}
+        <a class="cal-day" href="{{ day.href }}" data-day="{{ day.day }}" aria-label="{{ day.label }}"{% if day.day == month_calendar.selected %} aria-current="date"{% endif %}>
+          <span>{{ day.day.day }}</span>
+          <span class="cal-dots">{% if day.income %}<i class="dot dot-income"></i>{% endif %}{% if day.spend %}<i class="dot dot-spend"></i>{% endif %}</span>
+        </a>
+        {% else %}
+        <span class="cal-day is-{{ day.state }}" title="{{ day.label }}"><span>{{ day.day.day }}</span></span>
+        {% endif %}
+      {% endfor %}{% endfor %}
+    </div>
+    <p class="cal-legend"><span><i class="dot dot-income"></i>수입</span><span><i class="dot dot-spend"></i>지출</span></p>
+  </div>
+  <div class="day-box" aria-live="polite">
+    {% if not month_calendar.selected %}<p class="hint">이 달의 거래가 없습니다.</p>{% endif %}
+    {% for detail in month_calendar.details %}
+    <div class="day-detail" data-day-detail="{{ detail.day }}"{% if detail.day != month_calendar.selected %} hidden{% endif %}>
+      <h3>{{ detail.title }}</h3>
+      <div class="day-totals">
+        {% if detail.spend %}<a href="{{ detail.spend_href }}"><i class="dot dot-spend"></i><span>지출</span><strong>{{ detail.spend | won }}</strong></a>{% endif %}
+        {% if detail.income %}<a href="{{ detail.income_href }}"><i class="dot dot-income"></i><span>수입</span><strong>{{ detail.income | won }}</strong></a>{% endif %}
+      </div>
+      <ul class="rows">
+        {% for line in detail.lines %}
+        <li><span>{{ line.name }}{% if line.hint %}<small class="hint">{{ line.hint }}</small>{% endif %}</span><span class="num">{{ line.amount | signed_won if line.is_income else line.amount | won }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# 달력 탭과 물감 탭에 따라 바뀌는 카드. 지출 카드들 사이에 놓인다. #}
+{% macro category_panels(chart_link) %}
+<section class="card dash-side dash-wide dash-only-calendar">
+  <div class="band-head"><h2>카테고리별 12개월</h2><a class="widget-link" href="{{ chart_link }}">더 보기</a></div>
+  <div class="multiples" data-dash-multiples></div>
+</section>
+<section class="card dash-side dash-wide dash-only-paint">
+  <div class="band-head"><h2>카테고리 트리맵</h2><a class="widget-link" href="{{ chart_link }}">더 보기</a></div>
+  <div class="dash-side-body"><div class="dash-canvas" data-dash-treemap></div></div>
+</section>
+{% endmacro %}
+
+{% macro flow_panels(selected) %}
+<section class="card dash-side dash-only-calendar">
+  <div class="band-head"><h2>월별 수입 - 지출</h2><a class="widget-link" href="/chart?tab=flow&amp;month={{ selected }}">더 보기</a></div>
+  <div class="dash-side-body"><div class="dash-canvas" data-dash-difference></div></div>
+</section>
+<section class="card dash-side dash-only-paint">
+  <div class="band-head"><h2>수입·지출 흐름</h2><a class="widget-link" href="/chart?tab=flow&amp;month={{ selected }}">더 보기</a></div>
+  <div class="dash-side-body"><div class="dash-canvas" data-dash-sankey></div></div>
+</section>
+{% endmacro %}
+
+{% macro book_row(row) %}
+{% if row.href %}<a class="book-row" href="{{ row.href }}">{% else %}<div class="book-row">{% endif %}
+  <span class="book-name">{{ row.name }}{% if row.hint %} <small class="hint">{{ row.hint }}</small>{% endif %}</span>
+  <span class="book-extra">
+    {% if row.width is not none %}{{ charts.hbar(row.width, none) }}{% elif row.share is not none %}<small class="hint">{{ row.share | percent }}</small>{% endif %}
+  </span>
+  <span class="book-amount">{{ "{:,}".format(row.amount) }}</span>
+{% if row.href %}</a>{% else %}</div>{% endif %}
+{% endmacro %}
+
+{% macro book_section(section) %}
+<div class="book-section">
+  <h4>{{ section.title }}</h4>
+  {% for row in section.rows %}{{ book_row(row) }}{% endfor %}
+  <div class="book-row book-total"><span class="book-name">합계</span><span class="book-extra"></span><span class="book-amount">{{ "{:,}".format(section.total) }}</span></div>
+</div>
+{% endmacro %}
+
+{# 왼쪽은 그 달의 흐름, 오른쪽은 그날의 재산. 맨 아래 값에는 회계처럼 겹줄을 긋는다. #}
+{% macro book(data, selected) %}
+<section class="card book" id="book">
+  <h2 class="book-title">{{ selected | month_label }} 장부</h2>
+  <div class="book-pages">
+    <div class="book-page">
+      <p class="book-caption">수입·지출 · 단위 원</p>
+      {{ book_section(data.income) }}
+      {{ book_section(data.spend) }}
+      <p class="book-end"><span>수입 - 지출</span><strong>{{ "{:,}".format(data.left) }}</strong></p>
+    </div>
+    <div class="book-page">
+      <p class="book-caption">{{ data.as_of.month }}월 {{ data.as_of.day }}일 자산 · 단위 원</p>
+      {{ book_section(data.assets) }}
+      {{ book_section(data.debts) }}
+      <p class="book-end"><span>순자산</span><strong>{{ "{:,}".format(data.net) }}</strong></p>
+      {% if data.net_change is not none %}<p class="book-note"><span>전달보다</span> <span class="num">{{ data.net_change | signed_won }}</span></p>{% endif %}
+      {% if data.chart %}{{ charts.line(data.chart, "순자산 추이") }}{% endif %}
+    </div>
+  </div>
+</section>
+{% endmacro %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}OTP 확인 · 가계부{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>OTP 확인</h1>
+  {% if wait %}
+    <p class="notice error">실패가 반복되어 잠시 잠겼습니다. {{ wait }} 뒤에 다시 시도해 주세요. 틀릴수록 기다리는 시간이 늘어납니다.</p>
+  {% elif error == "code" %}
+    <p class="notice error">코드가 맞지 않습니다. 새 코드가 나오면 다시 입력해 주세요.</p>
+  {% elif error == "recovery" %}
+    <p class="notice error">복구 코드가 맞지 않거나 이미 사용한 코드입니다.</p>
+  {% endif %}
+  <form method="post" action="/auth/mfa" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="code">Google Authenticator의 6자리 코드</label>
+    <input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+           autocomplete="one-time-code" required autofocus>
+    <button class="button primary" type="submit">확인</button>
+  </form>
+  <details class="recovery">
+    <summary>휴대폰을 쓸 수 없나요?</summary>
+    <form method="post" action="/auth/recovery" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="recovery-code">복구 코드</label>
+      <input id="recovery-code" name="code" autocomplete="off" spellcheck="false" required>
+      <button class="button" type="submit">복구 코드로 OTP 다시 등록</button>
+      <p class="hint">코드를 쓰면 다른 기기는 모두 로그아웃되고 OTP를 새로 등록합니다.</p>
+    </form>
+  </details>
+</section>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% set nav = "assets" %}
+{% block title %}자산 추가 · 가계부{% endblock %}
+{% block content %}
+<h1>자산 추가</h1>
+<p class="hint"><a href="/">홈으로 돌아가기</a></p>
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+
+<nav class="tabs" aria-label="자산 종류">
+  {% for key, name in kind_labels.items() %}
+  <a href="/assets/manual/new?kind={{ key }}"{% if key == kind %} aria-current="true"{% endif %}>{{ name }}</a>
+  {% endfor %}
+</nav>
+
+<form method="post" action="/assets/manual" class="card stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  {% if kind == "other" %}
+  <fieldset class="choices">
+    <legend>종류</legend>
+    {% for value, name in other_type_labels.items() %}
+    <label class="choice"><input type="radio" name="other_type" value="{{ value }}" required><span>{{ name }}</span></label>
+    {% endfor %}
+  </fieldset>
+  <label for="name">이름</label>
+  <input id="name" name="name" maxlength="60" required placeholder="예: 비트코인, 금 10돈, 비상금">
+  <label for="amount">금액</label>
+  <input id="amount" name="amount" inputmode="numeric" required pattern="[0-9,원 ]+" title="숫자로 입력해 주세요" placeholder="예: 3000000" data-amount>
+  <label for="memo">메모 (선택)</label>
+  <textarea id="memo" name="memo" rows="3" maxlength="300" placeholder="예: 거래소 지갑에 보관"></textarea>
+  <p class="hint">뱅크샐러드에도 등록한 자산이면 두 번 계산됩니다.</p>
+  <button class="button primary" type="submit">완료</button>
+  {% else %}
+  <label for="name">이름</label>
+  <input id="name" name="name" maxlength="60" required placeholder="{% if kind == 'car' %}예: 쏘나타{% else %}예: 우리 집{% endif %}">
+
+  {% if kind == "car" %}
+  <label for="car_class">차급</label>
+  <select id="car_class" name="car_class" required>
+    {% for value, name in car_class_labels.items() %}<option value="{{ value }}"{% if value == "mid" %} selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  <label for="car_origin">제조국</label>
+  <select id="car_origin" name="car_origin" required>
+    {% for value, name in car_origin_labels.items() %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+  </select>
+  <label for="first_registered">최초 등록 연월 (출고)</label>
+  <input id="first_registered" name="first_registered" type="month" max="{{ today.strftime('%Y-%m') }}" required>
+  <label for="base_price">구입 가격</label>
+  <input id="base_price" name="base_price" inputmode="numeric" required placeholder="예: 30000000" data-amount>
+  <label for="base_date">구입 연월 (중고로 샀을 때만)</label>
+  <input id="base_date" name="base_date" type="month" max="{{ today.strftime('%Y-%m') }}">
+  <label class="check"><input type="checkbox" name="depreciate" value="1"> 감가상각 반영하기</label>
+  {% else %}
+  <fieldset class="choices">
+    <legend>타입</legend>
+    {% for value, name in tenure_choices.items() %}
+    <label class="choice"><input type="radio" name="tenure" value="{{ value }}"{% if value == "own" %} checked{% endif %}><span>{{ name }}</span></label>
+    {% endfor %}
+  </fieldset>
+  <label for="amount"><span class="for-own">구매가</span><span class="for-lease">보증금</span></label>
+  <input id="amount" name="amount" inputmode="numeric" required placeholder="예: 500000000" data-amount>
+  <label for="market_value" class="for-own">현재 시세 (선택)</label>
+  <input id="market_value" class="for-own" name="market_value" inputmode="numeric" placeholder="비우면 구매가로 저장합니다" data-amount>
+  <label for="monthly_rent" class="for-wolse">월세</label>
+  <input id="monthly_rent" class="for-wolse" name="monthly_rent" inputmode="numeric" placeholder="예: 550000" data-amount>
+  <label for="acquired_on">언제부터 갖고 있었나요 (선택)</label>
+  <input id="acquired_on" name="acquired_on" type="date" max="{{ today }}">
+  {% endif %}
+
+  <p class="hint">뱅크샐러드에도 등록한 자산이면 두 번 계산됩니다.</p>
+  <button class="button primary" type="submit">추가</button>
+  {% endif %}
+</form>
+<script src="/js/amount-reading.js" defer></script>
+{% endblock %}

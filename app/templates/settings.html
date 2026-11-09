@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% import "_warnings.html" as warning_ui %}
+{% set nav = "settings" %}
+{% block title %}설정 · 가계부{% endblock %}
+{% macro otp_field(field_id) %}
+  {% if needs_otp %}
+  <label for="{{ field_id }}">OTP 코드</label>
+  <input id="{{ field_id }}" name="otp_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+  {% endif %}
+{% endmacro %}
+{% block content %}
+<h1>설정</h1>
+{% if message %}<p class="notice ok">{{ message }}</p>{% endif %}
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+{% if warnings %}<div class="capsules">{{ warning_ui.warning_list(warnings, "/settings", csrf_token) }}</div>{% endif %}
+
+<section class="card">
+  <h2>뱅크샐러드 파일 비밀번호</h2>
+  <p class="hint">내보내기 파일을 여는 데만 씁니다. 뱅크샐러드 로그인 비밀번호가 아닙니다. 저장한 값은 다시 볼 수 없습니다.</p>
+  <dl class="facts">
+    <dt>상태</dt><dd>{% if file_password_updated %}설정됨 ({{ file_password_updated | kst("%Y-%m-%d") }} 변경){% else %}미설정{% endif %}</dd>
+    <dt>최근 가져오기</dt><dd>{% if latest_batch %}{{ latest_batch.created_at | kst }} (데이터 기준일 {{ latest_batch.period_end }}){% else %}없음{% endif %}</dd>
+  </dl>
+  <form method="post" action="/settings/file-password" class="stack" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="file-password">새 비밀번호</label>
+    <input id="file-password" name="file_password" type="password" autocomplete="new-password" minlength="4" maxlength="128" required>
+    {{ otp_field("otp-password") }}
+    <button class="button primary" type="submit">저장</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>내 이름</h2>
+  <p class="hint">이 이름으로 오간 이체는 내 계좌 이동으로 봅니다. 은행마다 다르게 찍히면 쉼표로 나눠 적어 주세요.</p>
+  <form method="post" action="/settings/own-names" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="own-names">이름</label>
+    <input id="own-names" name="names" maxlength="170" autocomplete="off" placeholder="예: 홍길동, 홍*동" value="{{ own_names | join(', ') }}">
+    <button class="button primary" type="submit">저장</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>메일 수신과 백업</h2>
+  <dl class="facts">
+    <dt>수신 스크립트 신호</dt><dd>{{ heartbeat | kst if heartbeat else "아직 없음" }}</dd>
+    <dt>마지막 백업</dt><dd>{{ last_backup | kst if last_backup else "아직 없음" }}</dd>
+  </dl>
+  {% if quarantined %}
+  <h3>처리 대기 파일</h3>
+  <ul class="rows">
+    {% for item in quarantined %}
+    <li>
+      <span>{{ item.at | kst }} · {{ item.reason }}</span>
+      <span class="actions">
+        {% if item.retryable %}
+        <form method="post" action="/settings/quarantine/{{ item.id }}/retry">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="button" type="submit">다시 처리</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/settings/quarantine/{{ item.id }}/dismiss">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="button" type="submit">지우기</button>
+        </form>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <h3>직접 올리기</h3>
+  <p class="hint">메일 수신이 멈췄을 때 내보내기 ZIP을 직접 올릴 수 있습니다.</p>
+  <form method="post" action="/settings/upload" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="file" type="file" accept=".zip" required>
+    <button class="button" type="submit">올리기</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>로그인한 기기</h2>
+  <ul class="rows">
+    {% for device in devices %}
+    <li>
+      <span>{{ device.user_agent or "알 수 없는 기기" }}<br><small class="hint">마지막 사용 {{ device.last_seen_at | kst }}{% if device.id == auth.id %} · 지금 이 기기{% endif %}</small></span>
+      <form method="post" action="{% if device.id == auth.id %}/auth/logout{% else %}/settings/sessions/{{ device.id }}/revoke{% endif %}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="button" type="submit">로그아웃</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/settings/sessions/revoke-others" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {{ otp_field("otp-sessions") }}
+    <button class="button" type="submit">다른 기기 모두 로그아웃</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>OTP와 복구 코드</h2>
+  <dl class="facts"><dt>남은 복구 코드</dt><dd>{{ recovery_left }}개</dd></dl>
+  <form method="post" action="/settings/recovery-codes" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {{ otp_field("otp-codes") }}
+    <button class="button" type="submit">복구 코드 새로 발급</button>
+  </form>
+  <form method="post" action="/settings/otp/reset" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {{ otp_field("otp-reset") }}
+    <button class="button danger" type="submit">OTP 다시 등록 (다른 기기 모두 로그아웃)</button>
+  </form>
+</section>
+{% endblock %}

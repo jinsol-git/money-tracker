@@ -1,0 +1,23 @@
+# 실제 금융 데이터는 저장소에 넣지 않는다
+*.zip
+*.xlsx
+*.xls
+*.csv
+private/
+
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Vercel
+.vercel/
+
+# macOS
+.DS_Store

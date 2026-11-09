@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "_recurring.html" as recurring_ui %}
+{% set nav = "review" %}
+{% block title %}반복 거래 · 가계부{% endblock %}
+{% block content %}
+<h1>반복 거래</h1>
+{% if message %}<p class="notice ok">{{ message }}</p>{% endif %}
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+
+{% if connect %}
+<section class="card">
+  <h2>{{ connect.loan.name }}에 이을 납입</h2>
+  {% if connect.rows %}
+  <ul class="rows">
+    {% for row in connect.rows %}
+    {% set group = row.group %}
+    <li>
+      <span>{{ group.description }}<br><small class="hint">{% if group.period %}{{ group.period }}{% if group.typical_day %} {{ group.typical_day }}일쯤{% endif %} · {% endif %}{{ group.times }}회 · {{ group.typical_amount | won }}</small></span>
+      <form method="post" action="/recurring/links">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="description" value="{{ group.description }}">
+        <input type="hidden" name="loan" value="{{ connect.loan.key }}">
+        <input type="hidden" name="asset" value="{{ row.asset or '' }}">
+        <input type="hidden" name="back" value="{{ connect.back }}">
+        <button class="button{% if row.guess == connect.loan.key %} primary{% endif %}" type="submit">연결</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">이을 만한 정기 출금이 없습니다.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<nav class="tabs" aria-label="반복 거래 종류">
+  {% for key, name in kind_labels.items() %}
+  <a href="/recurring?view={{ key }}"{% if key == view %} aria-current="true"{% endif %}>{{ name }} <small>{{ counts[key] }}</small></a>
+  {% endfor %}
+</nav>
+
+<section class="card">
+  {% if groups %}
+  <ul class="lines">
+    {% for group in groups %}{{ recurring_ui.group_item(group, recurring, back, csrf_token, false) }}{% endfor %}
+  </ul>
+  {% else %}
+  <p>여기에 해당하는 거래가 없습니다.</p>
+  {% endif %}
+</section>
+
+{% if rules %}
+<section class="card">
+  <h2>적용 중인 규칙</h2>
+  <ul class="rows">
+    {% for rule in rules %}
+    <li>
+      <span>{{ rule.name }}<br><small class="hint">{% if rule.set_nature %}{{ nature_labels[rule.set_nature] }}{% endif %}{% if rule.set_category_id %} · {{ category_names.get(rule.set_category_id, "") }}{% endif %}{% if rule.match_amount_min is not none %} · {{ rule.match_amount_min | won }} ~ {{ rule.match_amount_max | won }}{% endif %}</small></span>
+      <form method="post" action="/recurring/rules/{{ rule.id }}/disable">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="view" value="{{ view }}">
+        <button class="button" type="submit">해제</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+<script src="/js/category-choices.js" defer></script>
+<script src="/js/review-forms.js" defer></script>
+{% endblock %}

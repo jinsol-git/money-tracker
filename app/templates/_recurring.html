@@ -1,0 +1,114 @@
+{% from "_lines.html" import quick_picks %}
+{# 방향에 맞는 버튼을 한 번 누르면 끝난다. 다른 분류와 새 카테고리, 금액 조건은 접어 둔다. #}
+{% macro group_form(group, context, back, csrf_token) %}
+<form method="post" action="/recurring/rules" class="fix-form" data-inline>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="description" value="{{ group.description }}">
+  <input type="hidden" name="direction" value="{{ group.direction }}">
+  <input type="hidden" name="back" value="{{ back }}">
+  {{ quick_picks(context.category_help, group.direction, context.category_help.pick_of(group.suggestion.nature, group.suggestion.category_key)) }}
+  <details class="fix form-more">
+    <summary>다른 분류 · 최근 금액 · 새 카테고리</summary>
+    <div class="fix-grid">
+  <label>종류
+    <select name="nature">
+      {% for value, name in context.nature_labels.items() %}<option value="{{ value }}"{% if value == (group.suggestion.nature or group.nature) %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% set help = context.category_help %}
+  {% set kind = help.kinds.get(group.suggestion.nature or group.nature) %}
+  {% set auto = help.auto(group.source) %}
+  <label>카테고리
+    <select name="category" data-category-choices data-auto-expense="{{ auto.expense }}" data-auto-income="{{ auto.income }}"{% if not kind %} disabled{% endif %}>
+      <option value="">{% if kind %}{{ auto[kind] or "자동으로 찾기" }}{% else %}카테고리 없음{% endif %}</option>
+      {% set suggested = context.suggested_ids.get(group.suggestion.category_key) %}
+      <optgroup label="지출" data-kind="expense"{% if kind != "expense" %} hidden disabled{% endif %}>{% for category in context.categories.expense %}<option value="{{ category.id }}"{% if category.id == suggested %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
+      <optgroup label="수입" data-kind="income"{% if kind != "income" %} hidden disabled{% endif %}>{% for category in context.categories.income %}<option value="{{ category.id }}"{% if category.id == suggested %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
+      <option value="internal"{% if not kind %} hidden disabled{% endif %}>내 계좌 이동</option>
+    </select>
+  </label>
+  <button class="button primary" type="submit">적용</button>
+    </div>
+    <ul class="mini-list">
+      {% for day, amount in group.recent %}<li><span>{{ day }}</span><span class="num">{{ amount | won }}</span></li>{% endfor %}
+    </ul>
+    <label>새 카테고리
+      <input name="new_category" maxlength="30" placeholder="예: 동창회비">
+    </label>
+    <label class="check"><input type="checkbox" name="similar_only" value="1"{% if group.spread == "same" %} checked{% endif %}> {{ group.typical_amount | won }} 전후 20%일 때만</label>
+  </details>
+</form>
+{% endmacro %}
+
+{# 어디에 오가는 돈인지 잇는다. 대출에 이으면 납입을 이자와 원금으로 나누고, 아직 분류하지 않은 묶음은 함께 분류한다.
+   받은 돈은 연금에만 잇는다. #}
+{% macro link_select(label, name, options, chosen) %}
+<label>{{ label }}
+  <select name="{{ name }}">
+    <option value="">없음</option>
+    {% for value, option in options.items() %}<option value="{{ value }}"{% if chosen == value %} selected{% endif %}>{{ option }}</option>{% endfor %}
+  </select>
+</label>
+{% endmacro %}
+
+{% macro link_form(group, context, back, csrf_token, guess) %}
+{% set link = context.link_of.get((group.key, group.direction)) %}
+{% set out = group.direction == "out" %}
+{% set kinds = (["대출"] if out and context.link_loans else []) + (["부동산"] if out and context.link_assets else []) + (["연금"] if context.link_pensions else []) %}
+<details class="fix"{% if guess.found and not link %} open{% endif %}>
+  <summary>{{ "연결 바꾸기" if link else kinds | join("·") ~ "에 연결" }}</summary>
+  <form method="post" action="/recurring/links" class="fix-form" data-inline>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="description" value="{{ group.description }}">
+    <input type="hidden" name="direction" value="{{ group.direction }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    {% if out and context.link_loans %}{{ link_select("대출", "loan", context.link_loans, link.loan if link else guess.loan) }}{% endif %}
+    {% if out and context.link_assets %}{{ link_select("부동산", "asset", context.link_assets, link.asset if link else guess.asset) }}{% endif %}
+    {% if context.link_pensions %}{{ link_select("연금", "pension", context.link_pensions, link.pension if link else guess.pension) }}{% endif %}
+    <button class="button{% if guess.found and not link %} primary{% endif %}" type="submit">{% if link %}저장{% elif group.needs_review %}연결하고 분류{% else %}연결{% endif %}</button>
+  </form>
+</details>
+{% endmacro %}
+
+{# 검토 화면에서는 바로 적용할 수 있게 폼을 펼쳐 둔다. #}
+{% macro group_item(group, context, back, csrf_token, open_form) %}
+{% set rule = context.rule_of.get((group.key, group.direction)) %}
+{% set link = context.link_of.get((group.key, group.direction)) %}
+{% set guess = context.link_guess(group) %}
+{% set can_link = context.link_pensions or (group.direction == "out" and (context.link_loans or context.link_assets)) %}
+<li data-item="group:{{ group.key }}:{{ group.direction }}">
+  <div class="line-main">
+    <div>
+      <strong>{{ group.description }}</strong>
+      <p class="pill-line">
+        <span class="pill {{ 'ok' if group.kind == 'regular' else 'plain' }}">{{ context.kind_labels[group.kind] }}{% if group.tentative %} 후보{% endif %}</span>
+        {% if rule %}<span class="pill ok">규칙 적용 중</span>{% endif %}
+        {% if link %}
+        {% set names = ([context.link_loans.get(link.loan, "대출")] if link.loan else []) + ([context.link_assets.get(link.asset, "부동산")] if link.asset else []) + ([context.link_pensions.get(link.pension, "연금")] if link.pension else []) %}
+        <span class="pill ok">{{ names | join(" · ") }}에 연결</span>
+        {% elif can_link and guess.found %}
+        <span class="pill plain">{% if guess.pension %}{{ context.link_pensions[guess.pension] }}{% elif guess.loan %}{{ context.link_loans[guess.loan] }}{% else %}{{ context.link_assets[guess.asset] }}{% endif %} {{ "납입" if group.direction == "out" else "수령" }} 같음</span>
+        {% endif %}
+        {% if group.needs_review %}<span class="pill warn">분류 필요</span>{% endif %}
+      </p>
+      <small class="hint">
+        {% if group.period %}{{ group.period }}{% if group.typical_day %} {{ group.typical_day }}일쯤{% endif %} · {% endif %}{{ group.times }}회 · {{ group.first }} ~ {{ group.last }}<br>
+        {% if group.loan_split %}이자는 지출, 원금은 대출{% else %}{{ context.nature_labels[group.nature] }}{% if group.category_name %} · {{ group.category_name }}{% endif %}{% endif %} · {{ group.instrument_name }} · {{ "보낸 돈" if group.direction == "out" else "받은 돈" }}
+      </small>
+    </div>
+    <span class="amount-col">
+      <span class="num amount">{{ group.typical_amount | won }}</span>
+      <small class="hint">{{ context.spread_labels[group.spread] }}</small>
+    </span>
+  </div>
+  {% if open_form %}
+  {{ group_form(group, context, back, csrf_token) }}
+  {% else %}
+  <details class="fix">
+    <summary>분류 정하기</summary>
+    {{ group_form(group, context, back, csrf_token) }}
+  </details>
+  {% endif %}
+  {% if can_link %}{{ link_form(group, context, back, csrf_token, guess) }}{% endif %}
+</li>
+{% endmacro %}

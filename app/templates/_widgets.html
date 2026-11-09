@@ -1,0 +1,152 @@
+{% import "_charts.html" as charts %}
+
+{% macro head(key, title, index, count, month, editing, csrf_token, href, href_label) %}
+<div class="band-head widget-head">
+  <h2>{{ title }}</h2>
+  {% if href %}<a class="widget-link" href="{{ href }}">{{ href_label }}</a>{% endif %}
+</div>
+{% endmacro %}
+
+{# 차트 위젯은 속을 스크립트가 그린다. 그리는 코드는 탭 화면과 같다. #}
+{% macro chart_widget(key, info, title, index, count, month, editing, csrf_token) %}
+<section class="card widget chart-widget{% if info.span > 6 %} is-wide{% endif %}" id="widget-{{ key }}" data-home-chart="{{ key }}">
+  {{ head(key, title, index, count, month, editing, csrf_token, "/chart?tab=" ~ info.tab ~ "&month=" ~ month, "더 보기") }}
+  <div class="widget-body" data-body><p class="hint">아직 볼 기록이 없습니다.</p></div>
+</section>
+{% endmacro %}
+
+{# preview면 위젯 화면의 그림이다. 화면의 카드와 id가 겹치지 않게 뺀다. #}
+{% macro widget(key, card, title, index, count, month, editing, csrf_token, empty, add, preview=false) %}
+<section class="card widget"{% if not preview %} id="widget-{{ key }}"{% endif %}>
+  {% if key == "category" %}
+    {{ head(key, title, index, count, month, editing, csrf_token, card.link, "더 보기") }}
+    <div class="widget-body">{{ category(card, empty) }}</div>
+  {% elif key == "payment" %}
+    {{ head(key, title, index, count, month, editing, csrf_token, card.link, "더 보기") }}
+    <div class="widget-body">{{ payment(card, empty) }}</div>
+  {% elif key == "cards" %}
+    {{ head(key, title, index, count, month, editing, csrf_token, none, none) }}
+    <div class="widget-body">{{ cards_usage(card, empty) }}</div>
+  {% elif key == "net_worth" %}
+    {{ head(key, title, index, count, month, editing, csrf_token, "/chart?tab=assets", "더 보기") }}
+    <div class="widget-body">{{ net_worth(card, empty) }}</div>
+  {% elif key == "finance" %}
+    {{ head(key, title, index, count, month, editing, csrf_token, "/chart?tab=finance", "더 보기") }}
+    <div class="widget-body">{{ holding(card, empty, none) }}</div>
+  {% else %}
+    {{ head(key, title, index, count, month, editing, csrf_token, none, none) }}
+    <div class="widget-body">{{ holding(card, empty, add) }}</div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro category(card, empty) %}
+{% if card.slices %}
+<div class="donut-row">
+  <svg class="donut" viewBox="0 0 {{ card.size }} {{ card.size }}" role="img" aria-label="카테고리 비중">
+    {% for slice in card.slices %}<path class="series-{{ slice.slot }}" d="{{ slice.path }}"><title>{{ slice.name }} {{ slice.amount | won }} {{ slice.share | percent }}</title></path>{% endfor %}
+    <text x="{{ card.size / 2 }}" y="{{ card.size / 2 }}" dy="0.32em" text-anchor="middle">{{ card.total | compact_won }}</text>
+  </svg>
+  <div class="donut-bars">{{ charts.bars(card.top) }}</div>
+</div>
+{% if card.rest %}
+<details>
+  <summary>나머지 {{ card.rest | length }}개 카테고리</summary>
+  {{ charts.bars(card.rest) }}
+</details>
+{% endif %}
+{% else %}
+<p class="hint">{{ empty }}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro payment(card, empty) %}
+{% if card.top %}
+{{ charts.stack(card.segments) }}
+{{ charts.bars(card.top) }}
+{% if card.rest %}
+<details>
+  <summary>나머지 {{ card.rest | length }}개 결제 수단</summary>
+  {{ charts.bars(card.rest) }}
+</details>
+{% endif %}
+{% else %}
+<p class="hint">{{ empty }}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro cards_usage(card, empty) %}
+{% if card.rows %}
+<p class="big">{{ card.total | won }}</p>
+{{ charts.bars(card.rows) }}
+{% else %}
+<p class="hint">{{ empty }}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro net_worth(card, empty) %}
+{% if card.point %}
+<p class="big">{{ card.point.net_worth | won }}</p>
+<dl class="facts">
+  <dt>자산</dt><dd class="num">{{ card.point.total_assets | won }}</dd>
+  <dt>부채</dt><dd class="num">{{ card.point.total_liabilities | won }}</dd>
+  {% if card.change is not none %}<dt>전달보다</dt><dd class="num">{{ card.change | signed_won }}</dd>{% endif %}
+</dl>
+{% if card.chart %}{{ charts.line(card.chart, "순자산 추이") }}{% endif %}
+{% else %}
+<p class="hint">{{ empty }}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro money(value) %}{% if value is number %}{{ "{:,}".format(value | int) }}원{% else %}{{ value or "-" }}{% endif %}{% endmacro %}
+
+{% macro holding(card, empty, add) %}
+{% if card.sections or card.debts %}
+<p class="big">{{ card.total | won }}</p>
+{% if card.as_of %}<p class="hint">뱅크샐러드 {{ card.as_of }} 기준</p>{% endif %}
+{% if card.overlap %}<p class="notice warn">뱅크샐러드와 겹치면 두 번 계산됩니다.</p>{% endif %}
+{% for section in card.sections %}
+<h3 class="group-head"><span>{{ section.title }}</span> <span class="num">{{ section.total | won }}</span></h3>
+<ul class="rows">
+  {% for row in section.rows %}
+  <li>
+    <span>{% if row.href %}<a href="{{ row.href }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}{% if row.hint %}<br><small class="hint">{{ row.hint }}</small>{% endif %}</span>
+    <span class="num">{{ row.amount | won }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endfor %}
+{% if card.debts %}
+<h3 class="group-head"><span>대출·부채</span> <span class="num">{{ card.debt_total | won }}</span></h3>
+<ul class="rows">
+  {% for row in card.debts %}<li><span>{{ row.name }}<br><small class="hint">{{ row.hint }}</small></span><span class="num">{{ row.amount | won }}</span></li>{% endfor %}
+</ul>
+{% endif %}
+{% if card.details %}
+<details>
+  <summary>투자·대출·보험 현황</summary>
+  {% if card.details.investment %}
+  <h3>투자</h3>
+  <ul class="rows">
+    {% for row in card.details.investment %}<li><span>{{ row["상품명"] }}<br><small class="hint">{{ row["금융사"] }} · {{ row["투자상품종류"] }}{% if row["수익률"] is defined %} · 수익률 {{ row["수익률"] }}{% endif %}</small></span><span class="num">{{ money(row["평가금액"]) }}</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if card.details.loan %}
+  <h3>대출</h3>
+  <ul class="rows">
+    {% for row in card.details.loan %}<li><span>{{ row["상품명"] }}<br><small class="hint">{{ row["금융사"] }} · {{ row["대출종류"] }}{% if row["대출금리"] is defined %} · 금리 {{ row["대출금리"] }}{% endif %}</small></span><span class="num">{{ money(row["대출잔액"]) }}</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if card.details.insurance %}
+  <h3>보험</h3>
+  <ul class="rows">
+    {% for row in card.details.insurance %}<li><span>{{ row["보험명"] }}<br><small class="hint">{{ row["금융사"] }}{% if row["계약상태"] is defined %} · {{ row["계약상태"] }}{% endif %}</small></span><span class="num">{{ money(row["총납입금"]) }}</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+</details>
+{% endif %}
+{% else %}
+<p class="hint">{{ empty }}</p>
+{% endif %}
+{% if add %}<a class="button" href="/assets/manual/new?kind={{ add[0] }}">{{ add[1] }}</a>{% endif %}
+{% endmacro %}

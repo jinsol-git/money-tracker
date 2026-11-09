@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "_lines.html" as lines_ui %}
+{% import "_recurring.html" as recurring_ui %}
+{% set nav = "review" %}
+{% block title %}검토 · 가계부{% endblock %}
+{% block content %}
+<h1>검토</h1>
+{{ lines_ui.notices(change_notice, message, error, back, csrf_token) }}
+
+<nav class="tabs" aria-label="검토 목록">
+  {% for key, item in queues.items() %}
+  <a href="/review?queue={{ key }}"{% if key == queue %} aria-current="true"{% endif %}>{{ item.title }}{% if key in counts %} <small>{{ counts[key] }}</small>{% endif %}</a>
+  {% endfor %}
+  <a href="/recurring">반복 거래</a>
+</nav>
+
+{% if groups %}
+<section class="card">
+  <h2>반복 거래 <small class="hint">{{ groups | length }}</small></h2>
+  <ul class="lines">
+    {% for group in groups %}{{ recurring_ui.group_item(group, recurring, back, csrf_token, true) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if items or not groups %}
+<section class="card">
+  {% if groups %}<h2>한 번만 있는 거래</h2>{% endif %}
+  {% if items %}
+  {{ lines_ui.line_rows(items, back, categories, nature_labels, csrf_token, recurring.category_help, true) }}
+  {% else %}
+  <p>확인할 거래가 없습니다.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if changes %}
+<section class="card">
+  <h2>최근 변경</h2>
+  <ul class="rows">
+    {% for change in changes %}
+    <li>
+      <span>{{ change.summary }}<br><small class="hint">{{ change.created_at | kst }}</small></span>
+      <form method="post" action="/changes/{{ change.id }}/undo">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <button class="button" type="submit">되돌리기</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+<script src="/js/category-choices.js" defer></script>
+<script src="/js/review-forms.js" defer></script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{# 공지는 캡슐 하나로 통일한다. 평소에는 조용하고 확인할 것이 있을 때만 쨍하다. #}
+{% macro capsule(tag, text, tone="attention") %}
+<aside class="capsule tone-{{ tone }}">
+  <span class="capsule-tag">{{ tag }}</span>
+  <span class="capsule-text">{{ text }}</span>
+</aside>
+{% endmacro %}
+
+{% macro warning_list(warnings, back, csrf_token) %}
+{% for warning in warnings %}
+<aside class="capsule tone-{{ warning.tone }}" data-warning>
+  <span class="capsule-tag">{{ warning.tag }}</span>
+  <span class="capsule-text">{{ warning.text }}</span>
+  {% if warning.dismiss %}
+  <form method="post" action="/settings/warnings/{{ warning.dismiss }}/dismiss">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button class="capsule-go" type="submit">확인했어요</button>
+  </form>
+  {% endif %}
+</aside>
+{% endfor %}
+{% endmacro %}

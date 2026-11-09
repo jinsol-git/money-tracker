@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% import "_warnings.html" as warning_ui %}
+{% import "_widgets.html" as widget_ui %}
+{% import "_overview.html" as overview_ui %}
+{% set nav = "home" %}
+{% block page_class %} dash{% endblock %}
+{% macro widget_of(key, index, count) %}
+{% if key in chart_widgets %}
+{{ widget_ui.chart_widget(key, chart_widgets[key], titles[key], index, count, selected, editing, csrf_token) }}
+{% else %}
+{{ widget_ui.widget(key, cards[key], titles[key], index, count, selected, editing, csrf_token, empty_text[key], add_links.get(key)) }}
+{% endif %}
+{% endmacro %}
+{% block content %}
+{% if warnings or message %}
+<div class="capsules">
+  {{ warning_ui.warning_list(warnings, "/", csrf_token) }}
+  {% if message %}{{ warning_ui.capsule("완료", message) }}{% endif %}
+</div>
+{% endif %}
+
+<div class="home">
+  {% if has_data %}
+  <input class="dash-radio" type="radio" name="dash" id="dash-calendar" value="calendar" checked>
+  <input class="dash-radio" type="radio" name="dash" id="dash-paint" value="paint">
+  {% endif %}
+
+  <div class="bento">
+    <section class="card hero-card{% if not has_data %} is-alone{% endif %}">
+      <div class="month-nav">
+        {% if previous_link %}<a class="month-step" href="{{ previous_link }}" aria-label="이전 달"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg></a>{% else %}<span></span>{% endif %}
+        <h1>{{ selected | month_label }}</h1>
+        {% if next_link %}<a class="month-step" href="{{ next_link }}" aria-label="다음 달"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></a>{% else %}<span></span>{% endif %}
+      </div>
+      <div class="hero-body">
+        {% if not has_data %}
+        <h2>아직 볼 기록이 없습니다</h2>
+        <p>뱅크샐러드 앱에서 내보내기를 실행하면 메일로 받은 파일을 자동으로 가져옵니다. 메일 수신이 멈췄다면 <a href="/settings">설정</a>에서 파일을 직접 올릴 수 있습니다.</p>
+        {% else %}
+        <p class="eyebrow">지출{% if partial %} <small class="hint">{{ partial }}</small>{% endif %}</p>
+        <p class="hero">{{ summary.spend_total | won }}</p>
+        {% if previous %}<p class="hero-note"><span>전달보다</span> <span class="num">{{ (summary.spend_total - previous.spend_total) | signed_won }}</span></p>{% endif %}
+        {% if trend | length > 1 %}
+        <nav class="month-bars" aria-label="최근 달의 지출">
+          {% for bar in trend %}
+          <a href="{{ bar.href }}" aria-label="{{ bar.label }}" title="{{ bar.label }}"{% if bar.current %} aria-current="true"{% endif %}><svg aria-hidden="true"><rect x="50%" y="{{ 100 - bar.height }}%" width="24" height="{{ bar.height + 12 }}%" rx="4" transform="translate(-12 0)"/></svg></a>
+          {% endfor %}
+        </nav>
+        {% endif %}
+        <div class="wells">
+          <div><span>수입</span><strong class="num">{{ summary.income | won }}</strong></div>
+          <div><span>수입 - 지출</span><strong class="num">{{ (summary.income - summary.spend_total) | signed_won }}</strong></div>
+        </div>
+        {% if bridge %}
+        <details class="hero-bridge">
+          <summary>뱅크샐러드 합계와 비교</summary>
+          <table class="ledger">
+            <tbody>
+              <tr><th scope="row">뱅크샐러드 지출 합계</th><td>{{ bridge.banksalad_total | won }}</td></tr>
+              {% for label, amount in bridge_rows %}<tr><th scope="row">{{ label }}</th><td>{{ amount | signed_won }}</td></tr>{% endfor %}
+              <tr class="total"><th scope="row">이 앱의 지출</th><td>{{ bridge.our_total | won }}</td></tr>
+            </tbody>
+          </table>
+        </details>
+        {% endif %}
+        {% endif %}
+      </div>
+    </section>
+
+    {% if has_data %}
+    <section class="card dash-main" id="dashboard" data-dashboard data-month="{{ selected }}">
+      <div class="band-head">
+        <div class="dash-tabs">
+          <label for="dash-calendar">달력</label>
+          <label for="dash-paint">물감</label>
+        </div>
+        <a class="widget-link" href="{{ chart_link }}">더 보기</a>
+      </div>
+      <div class="dash-only-calendar">
+        {{ overview_ui.calendar(month_calendar) }}
+      </div>
+      <div class="dash-only-paint">
+        <div class="dash-title"><h3>카테고리 비중</h3><span class="num" data-dash-total></span></div>
+        <div class="strip" data-dash-strip></div>
+        <div class="chart-legend" data-dash-strip-legend></div>
+        <div class="dash-title"><h3>월별 카테고리</h3></div>
+        <div class="chart-legend" data-dash-stack-legend></div>
+        <div class="dash-canvas" data-dash-stack></div>
+      </div>
+      <noscript><p class="hint">차트는 자바스크립트가 켜져 있어야 보입니다.</p></noscript>
+    </section>
+    {% endif %}
+  </div>
+
+  <section class="home-group">
+    <div class="group-title">
+      <h2>지출</h2>
+      <a class="chip" href="{{ edit_link }}">위젯 편집</a>
+    </div>
+    <div class="widgets">
+      {% for key in layout.spend %}
+      {{ widget_of(key, loop.index0, loop.length) }}
+      {% if loop.first and has_data %}{{ overview_ui.category_panels(chart_link) }}{% endif %}
+      {% else %}
+      {% if has_data %}{{ overview_ui.category_panels(chart_link) }}{% endif %}
+      {% endfor %}
+      {% if has_data %}{{ overview_ui.flow_panels(selected) }}{% endif %}
+    </div>
+  </section>
+
+  {% if has_data %}{{ overview_ui.book(book, selected) }}{% endif %}
+
+  {% if layout.assets %}
+  <section class="home-group">
+    <div class="group-title"><h2>자산</h2></div>
+    <div class="widgets">
+      {% for key in layout.assets %}
+      {{ widget_of(key, loop.index0, loop.length) }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if editing %}
+  {# 위젯 화면. 그림을 누를 때마다 다음 순서로 골라지고, 적용을 누르면 그 순서로 놓인다. #}
+  <dialog class="picker widget-page" data-home-widget-page data-visible="{{ layout.visible | join(',') }}" aria-labelledby="home-widget-page-title">
+    <div class="picker-head">
+      <h2 id="home-widget-page-title">홈 위젯</h2>
+      <p class="picker-count" data-wp-count aria-live="polite"></p>
+    </div>
+    <div class="wp-body">
+      {% for group_name, keys in gallery %}
+      <h3 class="wp-section">{{ group_name }}</h3>
+      <div class="wp-grid">
+        {% for key in keys %}
+        <div class="wp-card" data-wp-card="{{ key }}">
+          <div class="wp-preview" inert>
+            <div class="wp-stage">
+              {% if key in chart_widgets %}
+              <section class="card widget chart-card" data-home-preview="{{ key }}">
+                <div class="band-head widget-head"><h2>{{ titles[key] }}</h2></div>
+                <div class="widget-body" data-body><p class="hint">아직 볼 기록이 없습니다.</p></div>
+              </section>
+              {% else %}
+              {{ widget_ui.widget(key, previews[key], titles[key], 0, 1, selected, false, csrf_token, empty_text[key], none, true) }}
+              {% endif %}
+            </div>
+          </div>
+          <span class="wp-mark"><strong></strong><span>선택됨</span></span>
+          <span class="wp-name">{{ titles[key] }}</span>
+          <button class="wp-hit" type="button" data-wp-key="{{ key }}" aria-pressed="false" aria-label="{{ titles[key] }} 고르기"></button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <form class="picker-foot" method="post" action="/home/widgets" data-wp-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="set">
+      <input type="hidden" name="month" value="{{ selected }}">
+      <a class="button" href="{{ done_link }}" data-wp-cancel>취소</a>
+      <button class="button primary" type="submit">적용</button>
+    </form>
+  </dialog>
+  {% endif %}
+</div>
+{% if has_data %}
+<script src="/js/chart-data.js" defer></script>
+<script src="/js/widget-data.js" defer></script>
+<script src="/js/chart-marks.js" defer></script>
+<script src="/js/chart-widgets.js" defer></script>
+<script src="/js/chart-page.js" defer></script>
+<script src="/js/dashboard.js" defer></script>
+{% endif %}
+{% if editing %}<script src="/js/home-widgets.js" defer></script>{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+Copyright (c) 2026 Jinsol Kim. All rights reserved.
+
+아래 조건을 지키면 이 소프트웨어를 자기 계정에 복사해 개인 용도로 설치하고, 실행하고, 고쳐 쓸 수 있습니다.
+
+1. 화면 하단 표시를 그대로 둡니다. 하단 표시는 app/templates/_footer.html이 만드는 블로그,
+   Instagram, 이메일, LinkedIn, X, GitHub 링크와 아이콘, "© JINSOL KIM" 문구입니다.
+   지우거나, 가리거나, 링크나 문구를 바꾸면 안 됩니다.
+2. 이 파일을 지우거나 바꾸면 안 됩니다.
+
+위에서 허락하지 않은 판매, 재배포, 다른 사람에게 서비스로 제공하는 일은 저작권자의 허락을 받아야 합니다.
+
+이 소프트웨어는 있는 그대로 제공합니다. 저작권자는 이 소프트웨어를 사용해서 생긴 손해에 책임을 지지 않습니다.
+여기에는 금융 데이터의 손실과 유출이 포함됩니다.
+
+public/fonts의 글꼴 Pretendard는 이 조건을 따르지 않습니다. 저작권자가 따로 있으며
+같은 폴더의 LICENSE-Pretendard.txt(SIL Open Font License 1.1)를 따릅니다.

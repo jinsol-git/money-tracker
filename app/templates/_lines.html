@@ -1,0 +1,75 @@
+{% macro notices(change_notice, message, error, back, csrf_token) %}
+{% if change_notice %}
+<div class="notice ok with-action">
+  <span>변경했습니다. {{ change_notice.summary }}</span>
+  <form method="post" action="/changes/{{ change_notice.id }}/undo">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button class="link" type="submit">되돌리기</button>
+  </form>
+</div>
+{% endif %}
+{% if message %}<p class="notice ok">{{ message }}</p>{% endif %}
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+{% endmacro %}
+
+{# 한 번에 고르는 버튼. 금액으로 방향을 알기 때문에 그 방향에 맞는 것만 보여 준다. 미리 골라 둔 분류는 맨 앞에서 강조한다. #}
+{% macro quick_picks(help, direction, suggested) %}
+{% set values = help.quick[direction] | map(attribute=0) | list %}
+<div class="quick-picks" role="group" aria-label="분류 고르기">
+  {% if suggested and suggested[0] not in values %}<button class="chip is-suggested" type="submit" name="choice" value="{{ suggested[0] }}">{{ suggested[1] }}</button>{% endif %}
+  {% for value, label in help.quick[direction] %}<button class="chip{% if suggested and value == suggested[0] %} is-suggested{% endif %}" type="submit" name="choice" value="{{ value }}">{{ label }}</button>{% endfor %}
+</div>
+{% endmacro %}
+
+{# 화면에서는 성격을 종류, 비목을 카테고리라고 부른다. 비목은 "그대로 두기"가 기본이며, 성격만 바꾸면 자동 분류가 맞는 비목을 찾는다.
+   quick이면 검토 화면이라 방향에 맞는 버튼을 바로 보여 준다. #}
+{% macro line_rows(items, back, categories, nature_labels, csrf_token, help, quick=false) %}
+<ul class="lines">
+  {% for item in items %}
+  <li data-item="split:{{ item.split_id }}">
+    <div class="line-main">
+      <div>
+        <strong>{{ item.description }}</strong>
+        {% set part = item.reason | split_part %}
+        <small class="hint">{{ item.occurred_date }} · {{ item.instrument_name }}<br>{{ nature_labels[item.nature] }}{% if item.category_name %} · {{ item.category_name }}{% endif %}{% if part %} · {{ part }}{% endif %}</small>
+      </div>
+      <span class="num amount">{{ item.amount | signed_won }}</span>
+    </div>
+    {% if quick %}
+    <form method="post" action="/splits/{{ item.split_id }}/change" class="quick-form" data-inline>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      {{ quick_picks(help, "out" if item.amount < 0 else "in", help.pick_of("funding", none) if item.reason == "charge_unpaired" else none) }}
+      <label class="check quick-remember"><input type="checkbox" name="remember" value="1"> 같은 상대 거래에 모두 적용</label>
+    </form>
+    {% endif %}
+    <details class="fix">
+      <summary>왜 이렇게 분류됐나요 · {{ "다른 분류" if quick else "고치기" }}</summary>
+      <p class="hint">{{ item.reason | reason_label }}<br>뱅크샐러드 분류: {{ item.source_type }} › {{ item.source_major }} › {{ item.source_minor }}</p>
+      <form method="post" action="/splits/{{ item.split_id }}/change" class="fix-form" data-inline>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <label>종류
+          <select name="nature">
+            {% for value, name in nature_labels.items() %}<option value="{{ value }}"{% if value == item.nature %} selected{% endif %}>{{ name }}</option>{% endfor %}
+          </select>
+        </label>
+        {% set kind = help.kinds.get(item.nature) %}
+        {% set auto = help.auto((item.source_type, item.source_major, item.source_minor)) %}
+        <label>카테고리
+          <select name="category" data-category-choices data-auto-expense="{{ auto.expense }}" data-auto-income="{{ auto.income }}" data-current="{{ item.category_name or '' }}" data-current-kind="{{ kind or '' }}"{% if not kind %} disabled{% endif %}>
+            <option value="">{% if kind %}그대로 두기{% if item.category_name %} ({{ item.category_name }}){% endif %}{% else %}카테고리 없음{% endif %}</option>
+            <optgroup label="지출" data-kind="expense"{% if kind != "expense" %} hidden disabled{% endif %}>{% for category in categories.expense %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</optgroup>
+            <optgroup label="수입" data-kind="income"{% if kind != "income" %} hidden disabled{% endif %}>{% for category in categories.income %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</optgroup>
+            <option value="internal"{% if not kind %} hidden disabled{% endif %}>내 계좌 이동</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" name="remember" value="1"> 같은 상대 거래에 모두 적용</label>
+        <button class="button primary" type="submit">저장</button>
+      </form>
+    </details>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}

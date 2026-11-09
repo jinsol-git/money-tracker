@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}복구 코드 · 가계부{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>복구 코드</h1>
+  <p class="notice warn"><strong>지금만 볼 수 있습니다.</strong> 비밀번호 관리자처럼 Google 계정 밖의 안전한 곳에 저장하세요. 휴대폰을 잃어버렸을 때 이 코드가 없으면 서버 관리 작업으로만 복구할 수 있습니다.</p>
+  <ul class="codes">
+    {% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}
+  </ul>
+  <p class="hint">코드는 각각 한 번만 쓸 수 있습니다.</p>
+  <a class="button primary" href="/">저장했습니다</a>
+</section>
+{% endblock %}

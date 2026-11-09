@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set nav = "assets" %}
+{% block title %}감가상각 확인 · 가계부{% endblock %}
+{% block content %}
+<h1>감가상각 확인</h1>
+<section class="card">
+  <p class="eyebrow">{{ asset.name }} · 오늘 기준 계산 금액</p>
+  <p class="hero">{{ depreciation.value | won }}</p>
+  <dl class="facts">
+    <dt>지금 금액</dt><dd class="num">{{ current | won }}</dd>
+    <dt>바뀌는 금액</dt><dd class="num">{{ change | signed_won }}</dd>
+    <dt>구입 가격</dt><dd class="num">{{ asset.base_price | won }} ({{ asset.base_date.strftime("%Y-%m") }})</dd>
+    <dt>기본 상각률</dt><dd class="num">연 {{ "%.1f" | format(depreciation.rate * 100) }}%</dd>
+    <dt>차 나이</dt><dd class="num">{{ depreciation.year }}년 차 (보정 {{ depreciation.factor }}배)</dd>
+  </dl>
+  <p class="hint">차급과 연식으로 계산한 추정치입니다.</p>
+  <form method="post" action="/assets/manual/{{ asset.id }}/depreciate" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="button primary" type="submit">확인, 반영하기</button>
+  </form>
+  <p><a href="/assets/manual/{{ asset.id }}">취소</a></p>
+</section>
+{% endblock %}

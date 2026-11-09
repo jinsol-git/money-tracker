@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set nav = "assets" %}
+{% block title %}감가상각 확인 · 가계부{% endblock %}
+{% macro hidden_fields() %}
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% for key, value in fields.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+{% endmacro %}
+{% block content %}
+<h1>감가상각 확인</h1>
+<section class="card">
+  <p class="eyebrow">{{ fields.name }} · 오늘 기준 계산 금액</p>
+  <p class="hero">{{ calculated | won }}</p>
+  <dl class="facts">
+    <dt>구입 가격</dt><dd class="num">{{ price | won }} ({{ priced_on.strftime("%Y-%m") }})</dd>
+    <dt>줄어든 금액</dt><dd class="num">{{ (calculated - price) | signed_won }}</dd>
+    <dt>차종</dt><dd>{{ car_class_labels[fields.car_class] }} · {{ car_origin_labels[fields.car_origin] }}</dd>
+    <dt>기본 상각률</dt><dd class="num">연 {{ "%.1f" | format(rate * 100) }}%</dd>
+    <dt>차 나이</dt><dd class="num">{{ year }}년 차</dd>
+  </dl>
+  <p class="hint">차급과 연식으로 계산한 추정치입니다.</p>
+  <form method="post" action="/assets/manual" class="stack">
+    {{ hidden_fields() }}
+    <input type="hidden" name="depreciate" value="1">
+    <input type="hidden" name="confirmed" value="1">
+    <button class="button primary" type="submit">이 금액으로 추가</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>금액을 직접 넣을까요</h2>
+  <form method="post" action="/assets/manual" class="stack">
+    {{ hidden_fields() }}
+    <label for="amount">지금 금액</label>
+    <input id="amount" name="amount" inputmode="numeric" required placeholder="예: 20000000" data-amount>
+    <button class="button" type="submit">이 금액으로 추가</button>
+  </form>
+</section>
+<a href="/assets/manual/new?kind=car">처음부터 다시 입력</a>
+<script src="/js/amount-reading.js" defer></script>
+{% endblock %}

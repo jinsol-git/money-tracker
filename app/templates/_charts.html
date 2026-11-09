@@ -1,0 +1,73 @@
+{% macro y_axis(chart) %}
+<svg class="yaxis" width="48" height="{{ chart.height }}" aria-hidden="true">
+  {% for tick in chart.ticks %}<text x="42" y="{{ tick.y }}" dy="0.32em" text-anchor="end">{{ tick.label }}</text>{% endfor %}
+</svg>
+{% endmacro %}
+
+{% macro gridlines(chart) %}
+{% for tick in chart.ticks %}<line class="{{ 'axis' if loop.first else 'grid' }}" x1="0" x2="100%" y1="{{ tick.y }}" y2="{{ tick.y }}"/>{% endfor %}
+{% endmacro %}
+
+{# 선은 가로세로 비율이 달라도 굵기가 그대로이고, 점은 % 좌표로 따로 그려 찌그러지지 않는다. #}
+{% macro line(chart, label) %}
+<div class="chart">
+  {{ y_axis(chart) }}
+  <svg class="plot" width="100%" height="{{ chart.height }}" role="img" aria-label="{{ label }}">
+    {{ gridlines(chart) }}
+    <svg class="stretch" width="100%" height="{{ chart.height }}" viewBox="0 0 100 {{ chart.height }}" preserveAspectRatio="none">
+      <polyline class="line" points="{{ chart.polyline }}" vector-effect="non-scaling-stroke"/>
+    </svg>
+    {% for point in chart.points %}
+    <g class="point{{ ' end' if loop.last }}">
+      <title>{{ point.title }}</title>
+      <circle class="hit" cx="{{ point.x }}%" cy="{{ point.y }}" r="12"/>
+      <circle class="dot" cx="{{ point.x }}%" cy="{{ point.y }}" r="4"/>
+    </g>
+    {% if loop.last %}<text class="value" x="100%" y="{{ point.y - 12 }}" text-anchor="end">{{ chart.last_value }}</text>{% endif %}
+    {% endfor %}
+    <text x="0" y="{{ chart.baseline + 16 }}">{{ chart.start_label }}</text>
+    <text x="100%" y="{{ chart.baseline + 16 }}" text-anchor="end">{{ chart.end_label }}</text>
+  </svg>
+</div>
+{% endmacro %}
+
+{% macro stack(segments) %}
+<svg class="stack" width="100%" height="12" aria-hidden="true">
+  <clipPath id="stack-clip"><rect width="100%" height="12" rx="4"/></clipPath>
+  <g clip-path="url(#stack-clip)">
+    {% for segment in segments if segment.width %}
+    <rect class="series-{{ segment.key }}" x="{{ segment.x }}%" width="{{ segment.width }}%" height="12"><title>{{ segment.label }} {{ segment.value | won }}</title></rect>
+    {% endfor %}
+  </g>
+</svg>
+<ul class="legend">
+  {% for segment in segments %}
+  <li>
+    <svg width="10" height="10" aria-hidden="true"><rect class="series-{{ segment.key }}" width="10" height="10" rx="2"/></svg>
+    <span>{{ segment.label }}</span>
+    <span class="num">{{ segment.value | won }}{% if segment.share is not none %} <small class="hint">{{ segment.share | percent }}</small>{% endif %}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{# 안쪽 svg가 왼쪽 끝을 잘라 내어 기준선 쪽은 각지고 값 쪽만 둥글다. #}
+{% macro hbar(width, slot) %}
+<svg class="hbar{% if slot %} series-{{ slot }}{% endif %}" width="100%" height="8" aria-hidden="true"><svg width="{{ width }}%" height="8"><rect x="-100%" width="200%" height="8" rx="4"/></svg></svg>
+{% endmacro %}
+
+{% macro bars(items) %}
+<ul class="bars">
+  {% for bar in items %}
+  <li>
+    {% if bar.href %}<a href="{{ bar.href }}">{% endif %}
+    <span class="bar-head">
+      <span>{{ bar.name }}{% if bar.hint %} <small class="hint">{{ bar.hint }}</small>{% endif %}</span>
+      <span class="num">{{ bar.amount | won }}{% if bar.share is not none %} <small class="hint">{{ bar.share | percent }}</small>{% endif %}</span>
+    </span>
+    {{ hbar(bar.width, bar.slot) }}
+    {% if bar.href %}</a>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}

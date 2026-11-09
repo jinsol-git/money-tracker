@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}로그인 · 가계부{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>로그인</h1>
+  {% if failed %}<p class="notice error">로그인을 완료하지 못했습니다. 다시 시도해 주세요.</p>{% endif %}
+  <a class="button primary" href="/auth/google">Google로 로그인</a>
+  <p class="hint">공용 기기에서는 시크릿 창을 쓰세요. 앱에서 로그아웃해도 Google 로그인은 남습니다.</p>
+</section>
+{% endblock %}

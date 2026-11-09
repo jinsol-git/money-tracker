@@ -1,0 +1,40 @@
+[project]
+name = "ledger"
+version = "0.1.0"
+description = "뱅크샐러드 내보내기 기반 개인 가계부"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "cryptography>=45",
+    "defusedxml>=0.7",
+    "fastapi>=0.117",
+    "httpx>=0.28",
+    "jinja2>=3.1",
+    "openpyxl>=3.1",
+    "psycopg[binary]>=3.2",
+    "pyjwt[crypto]>=2.10",
+    "pyotp>=2.9",
+    "python-multipart>=0.0.20",
+    "pyzipper>=0.3.6",
+    "segno>=1.6",
+    "sqlalchemy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "alembic>=1.13",
+    "httpx2>=2.16.0",
+    "msoffcrypto-tool>=5.4",
+    "pgserver>=0.1.4",
+    "pytest>=8",
+    "uvicorn>=0.35",
+]
+
+[tool.uv]
+package = false
+
+[tool.vercel]
+entrypoint = "app.main:app"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "scripts", "tests"]
+testpaths = ["tests"]

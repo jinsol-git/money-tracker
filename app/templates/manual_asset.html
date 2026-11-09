@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set nav = "assets" %}
+{% block title %}{{ asset.name }} · 가계부{% endblock %}
+{% block content %}
+<h1>{{ asset.name }}</h1>
+<p class="hint">{{ kind_labels[asset.kind] }}{% if asset.tenure %} · {{ tenure_labels[asset.tenure] }}{% endif %}{% if asset.monthly_rent %} · 월세 {{ asset.monthly_rent | won }}{% endif %}{% if asset.other_type %} · {{ other_type_labels[asset.other_type] }}{% endif %} · <a href="/">홈으로 돌아가기</a></p>
+{% if asset.memo %}<p class="memo">{{ asset.memo }}</p>{% endif %}
+{% if message %}<p class="notice ok">{{ message }}</p>{% endif %}
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+{% if asset.sold_on %}<p class="notice warn">{{ asset.sold_on }}부터 자산에서 뺐습니다.</p>{% endif %}
+
+{% set own = asset.kind == "real_estate" and asset.tenure == "own" %}
+{% set money = "시세" if own else ("보증금" if asset.kind == "real_estate" else "금액") %}
+<section class="card">
+  <p class="eyebrow">{{ "현재 시세" if own else ("보증금" if asset.kind == "real_estate" else "지금 금액") }} <small class="hint">{% if latest %}{{ latest.as_of }} 기준{% endif %}</small></p>
+  <p class="hero">{{ current | won }}</p>
+  {% if own and asset.base_price %}<p class="hint">구매가 {{ asset.base_price | won }}{% if asset.base_date %} · {{ asset.base_date }}{% endif %}</p>{% endif %}
+  <details class="fix">
+    <summary>{{ money }} 바꾸기</summary>
+    <form method="post" action="/assets/manual/{{ asset.id }}/value" class="fix-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>새 {{ money }} <input name="amount" inputmode="numeric" required placeholder="예: 520000000" data-amount></label>
+      <label>기준일 <input name="as_of" type="date" max="{{ today }}" value="{{ today }}"></label>
+      <button class="button primary" type="submit">저장</button>
+    </form>
+  </details>
+</section>
+
+{% if depreciation %}
+<section class="card">
+  <h2>감가상각</h2>
+  <dl class="facts">
+    <dt>오늘 기준 계산값</dt><dd class="num"><strong>{{ depreciation.value | won }}</strong></dd>
+    <dt>출발 금액</dt><dd class="num">{{ asset.base_price | won }} ({{ asset.base_date.strftime("%Y-%m") }})</dd>
+    <dt>기본 상각률</dt><dd class="num">연 {{ "%.1f" | format(depreciation.rate * 100) }}%</dd>
+    <dt>차 나이</dt><dd class="num">{{ depreciation.year }}년 차 (보정 {{ depreciation.factor }}배)</dd>
+  </dl>
+  <a class="button primary" href="/assets/manual/{{ asset.id }}/depreciate">감가상각 반영하기</a>
+  <p class="hint">차급과 연식으로 계산한 추정치입니다.</p>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>금액 기록</h2>
+  <ul class="rows">
+    {% for value in history %}
+    <li>
+      <span>{{ value.as_of }}<br><small class="hint">{{ "감가상각 반영" if value.source == "depreciation" else "직접 입력" }}</small></span>
+      <span class="actions">
+        <span class="num">{{ value.amount | won }}</span>
+        {% if history | length > 1 %}
+        <form method="post" action="/assets/manual/{{ asset.id }}/values/{{ value.id }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="link" type="submit">지우기</button>
+        </form>
+        {% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <details>
+    <summary>정보 고치기</summary>
+    <form method="post" action="/assets/manual/{{ asset.id }}/edit" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="name">이름</label>
+      <input id="name" name="name" maxlength="60" required value="{{ asset.name }}">
+      {% if asset.kind == "car" %}
+      <label for="car_class">차급</label>
+      <select id="car_class" name="car_class">
+        {% for value, name in car_class_labels.items() %}<option value="{{ value }}"{% if value == asset.car_class %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      <label for="car_origin">제조국</label>
+      <select id="car_origin" name="car_origin">
+        {% for value, name in car_origin_labels.items() %}<option value="{{ value }}"{% if value == asset.car_origin %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      <label for="first_registered">최초 등록 연월</label>
+      <input id="first_registered" name="first_registered" type="month" max="{{ today.strftime('%Y-%m') }}" value="{{ asset.first_registered.strftime('%Y-%m') }}">
+      <label for="base_price">구입 가격</label>
+      <input id="base_price" name="base_price" inputmode="numeric" value="{{ asset.base_price }}" data-amount>
+      <label for="base_date">구입 연월</label>
+      <input id="base_date" name="base_date" type="month" max="{{ today.strftime('%Y-%m') }}" value="{{ asset.base_date.strftime('%Y-%m') }}">
+      {% elif asset.kind == "real_estate" %}
+      <fieldset class="choices">
+        <legend>타입</legend>
+        {% for value, name in tenure_choices.items() %}
+        <label class="choice"><input type="radio" name="tenure" value="{{ value }}"{% if value == asset.tenure %} checked{% endif %}><span>{{ name }}</span></label>
+        {% endfor %}
+      </fieldset>
+      <label for="base_price" class="for-own">구매가</label>
+      <input id="base_price" class="for-own" name="base_price" inputmode="numeric" placeholder="예: 500000000" value="{{ asset.base_price or '' }}" data-amount>
+      <label for="monthly_rent" class="for-wolse">월세</label>
+      <input id="monthly_rent" class="for-wolse" name="monthly_rent" inputmode="numeric" placeholder="예: 550000" value="{{ asset.monthly_rent or '' }}" data-amount>
+      <label for="acquired_on">언제부터 갖고 있었나요</label>
+      <input id="acquired_on" name="acquired_on" type="date" max="{{ today }}" value="{{ asset.acquired_on }}">
+      {% else %}
+      <label for="other_type">종류</label>
+      <select id="other_type" name="other_type">
+        {% for value, name in other_type_labels.items() %}<option value="{{ value }}"{% if value == asset.other_type %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      <label for="memo">메모</label>
+      <textarea id="memo" name="memo" rows="3" maxlength="300">{{ asset.memo or "" }}</textarea>
+      {% endif %}
+      <button class="button" type="submit">저장</button>
+    </form>
+  </details>
+</section>
+
+<section class="card">
+  <details>
+    <summary>{{ "처분 취소" if asset.sold_on else "팔았거나 계약이 끝났나요" }}</summary>
+    <form method="post" action="/assets/manual/{{ asset.id }}/sold" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if asset.sold_on %}
+      <button class="button" type="submit">다시 자산에 넣기</button>
+      {% else %}
+      <label for="sold_on">처분한 날</label>
+      <input id="sold_on" name="sold_on" type="date" max="{{ today }}" required>
+      <button class="button" type="submit">이날부터 자산에서 빼기</button>
+      {% endif %}
+    </form>
+  </details>
+</section>
+
+<section class="card">
+  <details>
+    <summary>자산 지우기</summary>
+    <form method="post" action="/assets/manual/{{ asset.id }}/delete" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p class="hint">금액 기록도 함께 지워집니다.</p>
+      <button class="button danger" type="submit">지우기</button>
+    </form>
+  </details>
+</section>
+<script src="/js/amount-reading.js" defer></script>
+{% endblock %}

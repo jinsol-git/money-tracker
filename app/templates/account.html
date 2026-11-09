@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_charts.html" as charts %}
+{% set nav = "assets" %}
+{% block title %}계좌 · 가계부{% endblock %}
+{% block content %}
+<h1>{{ instrument.display_name }}</h1>
+<p class="hint">{{ kind_label }} · <a href="/">홈으로 돌아가기</a></p>
+
+<form method="get" action="/accounts/{{ instrument.id }}" class="card inline-form">
+  <label>기간
+    <select name="month">
+      <option value="">전체</option>
+      {% for value in months %}<option value="{{ value }}"{% if value == month %} selected{% endif %}>{{ value }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="button" type="submit">보기</button>
+</form>
+
+<section class="card">
+  <p class="eyebrow">이 계좌에서 나간 돈{% if month %} <small class="hint">{{ month | month_label }}</small>{% endif %}</p>
+  <p class="hero">{{ trace.total_out | won }}</p>
+  {% if trace.trace_rate is not none %}
+  <dl class="facts">
+    <dt>어디로 갔는지 아는 돈</dt><dd class="num">{{ trace.trace_rate | percent }}</dd>
+  </dl>
+  {% endif %}
+  {% if bars %}
+  {{ charts.bars(bars) }}
+  {% else %}
+  <p class="hint">이 기간에 나간 돈이 없습니다.</p>
+  {% endif %}
+  {% if trace.untracked %}<a href="/review">모르는 돈 검토하기</a> · {% endif %}<a href="{{ lines_link }}">이 계좌의 거래 보기</a>
+</section>
+
+{% if direct %}
+<section class="card">
+  <h2>바로 쓴 돈의 카테고리</h2>
+  <ul class="rows">
+    {% for name, amount in direct %}<li><span>{{ name }}</span><span class="num">{{ amount | won }}</span></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if balance %}
+<section class="card">
+  <h2>잔액</h2>
+  <p class="big">{{ balance[1] | won }}</p>
+  <p class="hint">{{ balance[0] }} 기준</p>
+  {% if chart %}{{ charts.line(chart, "잔액 추이") }}{% endif %}
+</section>
+{% endif %}
+{% endblock %}

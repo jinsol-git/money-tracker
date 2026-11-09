@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_lines.html" as lines_ui %}
+{% set nav = "transactions" %}
+{% block title %}기록 · 가계부{% endblock %}
+{% block content %}
+<h1>기록</h1>
+{{ lines_ui.notices(change_notice, message, error, back, csrf_token) }}
+
+<form method="get" action="/transactions" class="card filters">
+  <label>검색 <input type="search" name="q" value="{{ filters.q or '' }}" maxlength="100" placeholder="내용으로 찾기"></label>
+  <div class="filter-grid">
+    <label>시작일 <input type="date" name="start" value="{{ filters.start or '' }}"></label>
+    <label>종료일 <input type="date" name="end" value="{{ filters.end or '' }}"></label>
+  </div>
+  <div class="date-presets">
+    {% for name, href, active in date_presets %}<a class="chip" href="{{ href }}"{% if active %} aria-current="true"{% endif %}>{{ name }}</a>{% endfor %}
+  </div>
+  <details{% if more_filtered %} open{% endif %}>
+    <summary>조건 더 보기</summary>
+    <div class="filter-grid">
+      <label>종류
+        <select name="nature">
+          <option value="">전체</option>
+          {% for value, name in nature_filters.items() %}<option value="{{ value }}"{% if value == filters.nature %} selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>카테고리
+        <select name="category">
+          <option value="">전체</option>
+          <optgroup label="지출">{% for item in categories.expense %}<option value="{{ item.key }}"{% if item.key == filters.category %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</optgroup>
+          <optgroup label="수입">{% for item in categories.income %}<option value="{{ item.key }}"{% if item.key == filters.category %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</optgroup>
+        </select>
+      </label>
+      <label>결제 방식
+        <select name="channel">
+          <option value="">전체</option>
+          {% for value, name in channel_labels.items() %}<option value="{{ value }}"{% if value == filters.channel %} selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>결제 수단
+        <select name="instrument">
+          <option value="">전체</option>
+          {% for item in instruments %}<option value="{{ item.id }}"{% if item.id == filters.instrument %} selected{% endif %}>{{ item.display_name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+  </details>
+  <div class="actions start">
+    <button class="button primary" type="submit">찾기</button>
+    {% if filtered %}<a class="button" href="/transactions">조건 지우기</a>{% endif %}
+  </div>
+</form>
+
+<section class="card">
+  {# 조건이 없으면 내 계좌 이동까지 더한 값이라 뜻이 없다. #}
+  <p class="result-sum"><span>{{ "{:,}".format(lines.total) }}건</span>{% if filtered %} <span class="num">합계 {{ lines.amount | signed_won }}</span>{% endif %}</p>
+  {% if lines.items %}
+  {{ lines_ui.line_rows(lines.items, back, categories, nature_labels, csrf_token, category_help) }}
+  {% if pages > 1 %}
+  <nav class="pager" aria-label="페이지">
+    {% if previous %}<a class="button" href="{{ previous }}">이전</a>{% else %}<span></span>{% endif %}
+    <span class="hint">{{ page }} / {{ pages }}</span>
+    {% if following %}<a class="button" href="{{ following }}">다음</a>{% else %}<span></span>{% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+  <p class="hint">조건에 맞는 거래가 없습니다.</p>
+  {% endif %}
+</section>
+<script src="/js/category-choices.js" defer></script>
+<script src="/js/review-forms.js" defer></script>
+{% endblock %}

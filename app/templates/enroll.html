@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}OTP 등록 · 가계부{% endblock %}
+{% block content %}
+<section class="narrow card">
+  <h1>OTP 등록</h1>
+  {% if wait %}
+    <p class="notice error">실패가 반복되어 잠시 잠겼습니다. {{ wait }} 뒤에 다시 시도해 주세요. 틀릴수록 기다리는 시간이 늘어납니다.</p>
+  {% elif error == "code" %}
+    <p class="notice error">코드가 맞지 않습니다. 앱에 나온 새 코드를 입력해 주세요.</p>
+  {% endif %}
+  <ol class="steps">
+    <li>Google Authenticator를 엽니다. <strong>계정 없이 사용</strong>하세요. 클라우드 동기화를 켜 두면 Google 계정이 뚫릴 때 OTP도 함께 넘어갑니다.</li>
+    <li>아래 QR을 스캔합니다. 같은 기기에서 보고 있다면 설정 키를 직접 입력합니다.</li>
+    <li>앱에 나온 6자리 코드를 입력합니다.</li>
+  </ol>
+  <div class="qr">{{ qr | safe }}</div>
+  <p class="secret"><span class="hint">설정 키</span> <code data-secret="{{ secret }}">{{ secret }}</code></p>
+  <form method="post" action="/auth/enroll" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="code">6자리 코드</label>
+    <input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+           autocomplete="one-time-code" required>
+    <button class="button primary" type="submit">등록</button>
+  </form>
+  {% if auth.stage == "full" %}
+  <p class="hint">새 코드를 등록하기 전까지는 지금 쓰는 OTP가 그대로 유효합니다. <a href="/settings">취소하고 돌아가기</a></p>
+  {% endif %}
+</section>
+{% endblock %}
